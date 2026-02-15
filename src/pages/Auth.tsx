@@ -70,16 +70,16 @@ export default function Auth() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary">
-            <Shield className="h-7 w-7 text-primary-foreground" />
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-foreground">
+            <Shield className="h-7 w-7 text-primary" />
           </div>
-          <CardTitle className="text-2xl">
+          <CardTitle className="text-2xl" style={{ fontFamily: "'Playfair Display', serif" }}>
             {isLogin ? "Welcome back" : "Create your account"}
           </CardTitle>
           <CardDescription>
             {isLogin
-              ? "Sign in to track your payments"
-              : "Start tracking your credit cards and bills"}
+              ? "Sign in to Legacy Growth Solutions"
+              : "Start tracking with Legacy Growth Solutions"}
           </CardDescription>
         </CardHeader>
         <CardContent>
