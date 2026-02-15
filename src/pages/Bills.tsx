@@ -3,9 +3,10 @@ import { useBills, useUpdateBill, useDeleteBill, type Bill } from "@/hooks/useBi
 import { getDaysUntilDue, formatCurrency, formatDueDate } from "@/lib/dates";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { BillDialog } from "@/components/BillDialog";
+import { BillImportDialog } from "@/components/BillImportDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Trash2, Receipt, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Receipt, Check, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Bills() {
@@ -14,6 +15,7 @@ export default function Bills() {
   const deleteBill = useDeleteBill();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
 
   const handleEdit = (bill: Bill) => {
@@ -59,12 +61,17 @@ export default function Bills() {
           <h1 className="text-2xl font-bold lg:text-3xl">Bills</h1>
           <p className="text-sm text-muted-foreground">Track your recurring bills and payments</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="mr-1 h-4 w-4" />
-          Add Bill
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+            <Upload className="mr-1 h-4 w-4" />
+            Import CSV
+          </Button>
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="mr-1 h-4 w-4" />
+            Add Bill
+          </Button>
+        </div>
       </div>
-
       {isLoading ? (
         <p className="text-muted-foreground">Loading...</p>
       ) : bills.length === 0 ? (
@@ -177,6 +184,7 @@ export default function Bills() {
       )}
 
       <BillDialog open={dialogOpen} onOpenChange={handleDialogClose} bill={editingBill} />
+      <BillImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
     </div>
   );
 }
