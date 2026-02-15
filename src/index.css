@@ -124,6 +124,14 @@
     font-family: 'Playfair Display', serif;
     @apply tracking-tight;
   }
+
+  h1 {
+    @apply text-foreground;
+    background: linear-gradient(135deg, hsl(var(--foreground)), hsl(var(--primary)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
 }
 
 @layer utilities {

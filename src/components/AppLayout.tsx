@@ -114,7 +114,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="flex h-16 items-center gap-4 border-b border-border bg-card px-4 lg:px-8">
+        <header className="flex h-16 items-center gap-4 border-b border-border bg-card px-4 lg:px-8 shadow-sm">
           <button
             className="lg:hidden"
             onClick={() => setMobileOpen(true)}
