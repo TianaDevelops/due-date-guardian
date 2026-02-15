@@ -55,9 +55,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Logo */}
         <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
           <Shield className="h-7 w-7 text-sidebar-primary" />
-          <span className="text-lg font-bold tracking-tight text-sidebar-primary-foreground">
-            NeverLate
-          </span>
+          <div className="flex flex-col leading-tight">
+            <span className="text-sm font-bold tracking-tight text-sidebar-primary" style={{ fontFamily: "'Playfair Display', serif" }}>
+              Legacy Growth
+            </span>
+            <span className="text-[10px] uppercase tracking-widest text-sidebar-foreground/60">
+              Solutions
+            </span>
+          </div>
           <button
             className="ml-auto lg:hidden"
             onClick={() => setMobileOpen(false)}
