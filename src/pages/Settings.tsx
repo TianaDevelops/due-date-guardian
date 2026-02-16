@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { User, Phone, Save } from "lucide-react";
+import { User, Phone, Save, Sun, Moon, Monitor } from "lucide-react";
+import { useTheme } from "next-themes";
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
   const [displayName, setDisplayName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [loading, setLoading] = useState(false);
@@ -62,6 +64,36 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold lg:text-3xl">Settings</h1>
         <p className="text-sm text-muted-foreground">Manage your profile and preferences</p>
       </div>
+
+      <Card className="max-w-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sun className="h-5 w-5" />
+            Appearance
+          </CardTitle>
+          <CardDescription>Choose your preferred theme</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            {[
+              { value: "light", label: "Light", icon: Sun },
+              { value: "dark", label: "Dark", icon: Moon },
+              { value: "system", label: "System", icon: Monitor },
+            ].map((opt) => (
+              <Button
+                key={opt.value}
+                variant={theme === opt.value ? "default" : "outline"}
+                size="sm"
+                className="gap-2"
+                onClick={() => setTheme(opt.value)}
+              >
+                <opt.icon className="h-4 w-4" />
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="max-w-lg">
         <CardHeader>
