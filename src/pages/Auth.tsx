@@ -13,22 +13,36 @@ const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
 
 export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true);
+  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resetPassword } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const emailResult = emailSchema.safeParse(email);
     if (!emailResult.success) {
       toast({ title: "Invalid email", description: emailResult.error.errors[0].message, variant: "destructive" });
       return;
     }
+
+    if (mode === "forgot") {
+      setLoading(true);
+      const { error } = await resetPassword(email);
+      setLoading(false);
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Check your email", description: "We sent you a password reset link." });
+        setMode("login");
+      }
+      return;
+    }
+
     const passwordResult = passwordSchema.safeParse(password);
     if (!passwordResult.success) {
       toast({ title: "Invalid password", description: passwordResult.error.errors[0].message, variant: "destructive" });
@@ -37,7 +51,7 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      if (isLogin) {
+      if (mode === "login") {
         const { error } = await signIn(email, password);
         if (error) {
           const msg = error.message.includes("Invalid login")
@@ -74,10 +88,12 @@ export default function Auth() {
             <Shield className="h-7 w-7 text-primary" />
           </div>
           <CardTitle className="text-2xl" style={{ fontFamily: "'Playfair Display', serif" }}>
-            {isLogin ? "Welcome back" : "Create your account"}
+            {mode === "forgot" ? "Reset Password" : mode === "login" ? "Welcome back" : "Create your account"}
           </CardTitle>
           <CardDescription>
-            {isLogin
+            {mode === "forgot"
+              ? "Enter your email to receive a reset link"
+              : mode === "login"
               ? "Sign in to Legacy Growth Solutions"
               : "Start tracking with Legacy Growth Solutions"}
           </CardDescription>
@@ -95,30 +111,47 @@ export default function Auth() {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
+            {mode !== "forgot" && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            )}
+            {mode === "login" && (
+              <div className="text-right">
+                <button type="button" onClick={() => setMode("forgot")} className="text-xs text-primary hover:underline">
+                  Forgot password?
+                </button>
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Loading..." : isLogin ? "Sign in" : "Create account"}
+              {loading ? "Loading..." : mode === "forgot" ? "Send reset link" : mode === "login" ? "Sign in" : "Create account"}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm text-muted-foreground">
-            {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-            <button
-              type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="font-medium text-primary hover:underline"
-            >
-              {isLogin ? "Sign up" : "Sign in"}
-            </button>
+            {mode === "forgot" ? (
+              <button type="button" onClick={() => setMode("login")} className="font-medium text-primary hover:underline">
+                Back to sign in
+              </button>
+            ) : (
+              <>
+                {mode === "login" ? "Don't have an account?" : "Already have an account?"}{" "}
+                <button
+                  type="button"
+                  onClick={() => setMode(mode === "login" ? "signup" : "login")}
+                  className="font-medium text-primary hover:underline"
+                >
+                  {mode === "login" ? "Sign up" : "Sign in"}
+                </button>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
