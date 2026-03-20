@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "placeholder.svg", "sw-push-handler.js"],
+      includeAssets: ["favicon.ico", "placeholder.svg", "sw-push-handler.js", "icons/*.png"],
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         navigateFallbackDenylist: [/^\/~oauth/],
@@ -49,7 +49,7 @@ export default defineConfig(({ mode }) => ({
       manifest: {
         name: "Due Date Guardian",
         short_name: "DDG",
-        description: "Track credit card due dates, bill payments, and get escalating alerts.",
+        description: "Track credit card due dates, bill payments, and get escalating alerts. By Legacy Growth Solutions.",
         theme_color: "#1a1a1a",
         background_color: "#1a1a1a",
         display: "standalone",
@@ -57,9 +57,13 @@ export default defineConfig(({ mode }) => ({
         scope: "/",
         start_url: "/",
         icons: [
-          { src: "/pwa-192x192.png", sizes: "192x192", type: "image/png" },
-          { src: "/pwa-512x512.png", sizes: "512x512", type: "image/png" },
-          { src: "/pwa-512x512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          { src: "/icons/ddg_icon_48.png",  sizes: "48x48",   type: "image/png" },
+          { src: "/icons/ddg_icon_72.png",  sizes: "72x72",   type: "image/png" },
+          { src: "/icons/ddg_icon_96.png",  sizes: "96x96",   type: "image/png" },
+          { src: "/icons/ddg_icon_144.png", sizes: "144x144", type: "image/png" },
+          { src: "/icons/ddg_icon_192.png", sizes: "192x192", type: "image/png" },
+          { src: "/icons/ddg_icon_512.png", sizes: "512x512", type: "image/png" },
+          { src: "/icons/ddg_icon_512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
     }),
