@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { Shield, Mail, CheckCircle2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Shield, Mail, CheckCircle2, Phone, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +19,7 @@ export default function Auth() {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const { signIn, signUp, resetPassword } = useAuth();
   const navigate = useNavigate();
@@ -72,7 +74,19 @@ export default function Auth() {
             : error.message;
           toast({ title: "Sign up failed", description: msg, variant: "destructive" });
         } else {
-          // Show confirmation screen
+          // Save phone number to profile if provided
+          if (phone.trim()) {
+            // Profile is created by trigger — update it after a brief delay
+            setTimeout(async () => {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                await supabase
+                  .from("profiles")
+                  .update({ phone_number: phone.trim() })
+                  .eq("user_id", user.id);
+              }
+            }, 2000);
+          }
           setMode("check-email");
         }
       }
@@ -131,86 +145,130 @@ export default function Auth() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-foreground">
-            <Shield className="h-7 w-7 text-primary" />
-          </div>
-          <CardTitle className="text-2xl" style={{ fontFamily: "'Playfair Display', serif" }}>
-            {mode === "forgot" ? "Reset Password" : mode === "login" ? "Welcome back" : "Create your account"}
-          </CardTitle>
-          <CardDescription>
-            {mode === "forgot"
-              ? "Enter your email to receive a reset link"
-              : mode === "login"
-              ? "Sign in to Legacy Growth Solutions"
-              : "Start tracking with Legacy Growth Solutions"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
+      <div className="w-full max-w-md space-y-4">
+        <Card>
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-foreground">
+              <Shield className="h-7 w-7 text-primary" />
             </div>
-            {mode !== "forgot" && (
+            <CardTitle className="text-2xl" style={{ fontFamily: "'Playfair Display', serif" }}>
+              {mode === "forgot" ? "Reset Password" : mode === "login" ? "Welcome back" : "Create your account"}
+            </CardTitle>
+            <CardDescription>
+              {mode === "forgot"
+                ? "Enter your email to receive a reset link"
+                : mode === "login"
+                ? "Sign in to Legacy Growth Solutions"
+                : "Start tracking with Legacy Growth Solutions"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
-            )}
-            {mode === "login" && (
-              <div className="text-right">
-                <button type="button" onClick={() => setMode("forgot")} className="text-xs text-primary hover:underline">
-                  Forgot password?
+              {mode !== "forgot" && (
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+              {mode === "signup" && (
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="flex items-center gap-1">
+                    <Phone className="h-3.5 w-3.5" />
+                    Phone Number <span className="text-muted-foreground font-normal">(for SMS alerts)</span>
+                  </Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="+1 (555) 123-4567"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Optional — get text alerts 7, 3, 1 day before due dates
+                  </p>
+                </div>
+              )}
+              {mode === "login" && (
+                <div className="text-right">
+                  <button type="button" onClick={() => setMode("forgot")} className="text-xs text-primary hover:underline">
+                    Forgot password?
+                  </button>
+                </div>
+              )}
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading
+                  ? "Loading..."
+                  : mode === "forgot"
+                  ? "Send reset link"
+                  : mode === "login"
+                  ? "Sign in"
+                  : "Create account"}
+              </Button>
+            </form>
+            <div className="mt-4 text-center text-sm text-muted-foreground">
+              {mode === "forgot" ? (
+                <button type="button" onClick={() => setMode("login")} className="font-medium text-primary hover:underline">
+                  Back to sign in
                 </button>
+              ) : (
+                <>
+                  {mode === "login" ? "Don't have an account?" : "Already have an account?"}{" "}
+                  <button
+                    type="button"
+                    onClick={() => setMode(mode === "login" ? "signup" : "login")}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {mode === "login" ? "Sign up" : "Sign in"}
+                  </button>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Voice AI Support Card */}
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15">
+                <Mic className="h-5 w-5 text-primary" />
               </div>
-            )}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading
-                ? "Loading..."
-                : mode === "forgot"
-                ? "Send reset link"
-                : mode === "login"
-                ? "Sign in"
-                : "Create account"}
-            </Button>
-          </form>
-          <div className="mt-4 text-center text-sm text-muted-foreground">
-            {mode === "forgot" ? (
-              <button type="button" onClick={() => setMode("login")} className="font-medium text-primary hover:underline">
-                Back to sign in
-              </button>
-            ) : (
-              <>
-                {mode === "login" ? "Don't have an account?" : "Already have an account?"}{" "}
-                <button
-                  type="button"
-                  onClick={() => setMode(mode === "login" ? "signup" : "login")}
-                  className="font-medium text-primary hover:underline"
-                >
-                  {mode === "login" ? "Sign up" : "Sign in"}
-                </button>
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Need help? Call our AI assistant</p>
+                <p className="text-xs text-muted-foreground">Available 24/7 — answers questions about DDG instantly</p>
+              </div>
+              <a
+                href="tel:+13238797722"
+                className="shrink-0"
+              >
+                <Button size="sm" variant="outline" className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10">
+                  <Phone className="h-3.5 w-3.5" />
+                  Call
+                </Button>
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
