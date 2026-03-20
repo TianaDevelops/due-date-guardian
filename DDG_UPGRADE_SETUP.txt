@@ -1,0 +1,189 @@
+==============================================================
+DUE DATE GUARDIAN — UPGRADE SETUP GUIDE
+Legacy Growth Solutions
+==============================================================
+
+WHAT WAS ADDED IN THIS UPGRADE
+-------------------------------
+1. Fixed sign-up flow — clear "Check your email" screen after signup
+2. Theme toggle in top header (sun/moon icon) — no longer buried in Settings
+3. Banks page — Plaid integration for real bank account balance sync
+4. Push Notifications — native device alerts when added to home screen
+5. SMS Alerts via Twilio — texts from (424) 526-5989 at 7/3/1/0 days before due
+6. Mobile bottom navigation bar — proper iOS/Android app feel
+7. Notification badge on bell icon — shows unread count
+8. Improved Install page — platform-specific instructions (iOS/Android/Desktop)
+9. New database tables: plaid_accounts, push_subscriptions
+
+==============================================================
+STEP 1: PUSH TO GITHUB
+==============================================================
+In your terminal (or GitHub Desktop):
+
+  cd /path/to/due-date-guardian
+  git add .
+  git commit -m "Add Plaid, SMS alerts, push notifications, mobile nav"
+  git push origin main
+
+Netlify will auto-deploy from GitHub.
+
+==============================================================
+STEP 2: SUPABASE — RUN THE NEW MIGRATION
+==============================================================
+Go to: https://supabase.com/dashboard/project/kcgjicwdkxssxlsqsmpq/sql
+
+Run this SQL (copy from supabase/migrations/20260319000001_plaid_and_push.sql):
+
+  CREATE TABLE IF NOT EXISTS public.plaid_accounts (
+    id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    item_id TEXT NOT NULL UNIQUE,
+    access_token TEXT NOT NULL,
+    institution_name TEXT NOT NULL DEFAULT 'Bank',
+    accounts JSONB NOT NULL DEFAULT '[]',
+    last_synced TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+  );
+  ALTER TABLE public.plaid_accounts ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Users can view own plaid accounts" ON public.plaid_accounts FOR SELECT USING (auth.uid() = user_id);
+  CREATE POLICY "Users can insert own plaid accounts" ON public.plaid_accounts FOR INSERT WITH CHECK (auth.uid() = user_id);
+  CREATE POLICY "Users can update own plaid accounts" ON public.plaid_accounts FOR UPDATE USING (auth.uid() = user_id);
+  CREATE POLICY "Users can delete own plaid accounts" ON public.plaid_accounts FOR DELETE USING (auth.uid() = user_id);
+
+  CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+    id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+  );
+  ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Users can view own push subs" ON public.push_subscriptions FOR SELECT USING (auth.uid() = user_id);
+  CREATE POLICY "Users can insert own push subs" ON public.push_subscriptions FOR INSERT WITH CHECK (auth.uid() = user_id);
+  CREATE POLICY "Users can delete own push subs" ON public.push_subscriptions FOR DELETE USING (auth.uid() = user_id);
+
+==============================================================
+STEP 3: SUPABASE — FIX SIGN-UP (DISABLE EMAIL CONFIRMATION)
+==============================================================
+Go to: Supabase Dashboard → Authentication → Providers → Email
+Toggle OFF: "Confirm email"
+
+This lets users sign in immediately after signing up.
+(You can re-enable it later with a custom email template)
+
+==============================================================
+STEP 4: SUPABASE — DEPLOY EDGE FUNCTIONS
+==============================================================
+Install Supabase CLI if not already:
+  npm install -g supabase
+
+Login and link project:
+  supabase login
+  supabase link --project-ref kcgjicwdkxssxlsqsmpq
+
+Deploy the SMS alert function:
+  supabase functions deploy send-sms-alerts
+
+Deploy the Plaid functions:
+  supabase functions deploy plaid-create-link-token
+  supabase functions deploy plaid-exchange-token
+
+==============================================================
+STEP 5: SUPABASE — SET EDGE FUNCTION SECRETS
+==============================================================
+Go to: Supabase Dashboard → Settings → Edge Functions → Secrets
+Add these secrets:
+
+  TWILIO_ACCOUNT_SID    = (your Twilio Account SID from console.twilio.com)
+  TWILIO_AUTH_TOKEN     = (your Twilio Auth Token from console.twilio.com)
+  TWILIO_FROM_NUMBER    = +14245265989
+
+  PLAID_CLIENT_ID       = (get from dashboard.plaid.com)
+  PLAID_SECRET          = (get from dashboard.plaid.com — use Sandbox secret to test)
+  PLAID_ENV             = sandbox   (change to production when ready)
+
+==============================================================
+STEP 6: PLAID ACCOUNT SETUP
+==============================================================
+1. Go to https://dashboard.plaid.com and create a free account
+2. Create a new app/project
+3. Copy your Client ID and Sandbox Secret
+4. Add them to Supabase secrets (Step 5 above)
+5. In Plaid dashboard, add your domain to allowed redirect URIs:
+   https://ddg.legacygrowth.solutions
+
+To test with Plaid Sandbox:
+- Use username: user_good
+- Password: pass_good
+- This simulates a real bank connection with fake data
+
+==============================================================
+STEP 7: SET UP DAILY SMS CRON JOB
+==============================================================
+Go to: Supabase Dashboard → Database → Extensions
+Enable: pg_cron
+
+Then run this SQL to schedule daily SMS alerts at 9 AM:
+  SELECT cron.schedule(
+    'daily-sms-alerts',
+    '0 9 * * *',
+    $$
+    SELECT net.http_post(
+      url := 'https://kcgjicwdkxssxlsqsmpq.supabase.co/functions/v1/send-sms-alerts',
+      headers := '{"Authorization": "Bearer YOUR_SERVICE_ROLE_KEY"}'::jsonb
+    );
+    $$
+  );
+
+Replace YOUR_SERVICE_ROLE_KEY with your Supabase service role key
+(found in Settings → API → service_role key)
+
+==============================================================
+STEP 8: PUSH NOTIFICATION VAPID KEYS (OPTIONAL UPGRADE)
+==============================================================
+The app ships with a default VAPID key for testing.
+For production, generate your own key pair:
+
+1. Go to https://web-push-codelab.glitch.me/
+2. Generate a key pair
+3. Add to Netlify environment variables:
+   VITE_VAPID_PUBLIC_KEY = your_public_key
+4. Add VAPID_PRIVATE_KEY to Supabase Edge Function secrets
+   (needed when you add a server-side push sender function)
+
+==============================================================
+YOUR TWILIO NUMBER
+==============================================================
+Number: (424) 526-5989
+
+IMPORTANT: Register this number for A2P 10DLC in Twilio Console
+→ Messaging → Regulatory Compliance → A2P 10DLC
+This prevents SMS from being filtered as spam.
+
+==============================================================
+FILES CHANGED IN THIS UPGRADE
+==============================================================
+MODIFIED:
+  src/App.tsx                    — Added /banks route
+  src/pages/Auth.tsx             — Fixed sign-up UX with check-email screen
+  src/pages/Settings.tsx         — Added push notification + SMS toggles
+  src/pages/Install.tsx          — Polished install page with platform detection
+  src/components/AppLayout.tsx   — Theme toggle, notification badge, bottom nav
+  src/index.css                  — Added safe-area-bottom utility
+  index.html                     — Updated PWA meta tags
+  vite.config.ts                 — Updated PWA manifest name
+
+NEW FILES:
+  src/pages/Banks.tsx            — Plaid bank account linking page
+  src/hooks/usePlaid.ts          — Plaid Link hook + account queries
+  src/hooks/usePushNotifications.ts — Web Push API hook
+  supabase/functions/send-sms-alerts/index.ts
+  supabase/functions/plaid-create-link-token/index.ts
+  supabase/functions/plaid-exchange-token/index.ts
+  supabase/migrations/20260319000001_plaid_and_push.sql
+  public/sw-push-handler.js      — Service worker push event handler
+  DDG_UPGRADE_SETUP.txt          — This file
+
+==============================================================

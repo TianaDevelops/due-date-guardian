@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { Shield } from "lucide-react";
+import { Shield, Mail, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,8 +12,10 @@ import { z } from "zod";
 const emailSchema = z.string().email("Please enter a valid email address");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
 
+type Mode = "login" | "signup" | "forgot" | "check-email";
+
 export default function Auth() {
-  const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
+  const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -37,8 +39,7 @@ export default function Auth() {
       if (error) {
         toast({ title: "Error", description: error.message, variant: "destructive" });
       } else {
-        toast({ title: "Check your email", description: "We sent you a password reset link." });
-        setMode("login");
+        setMode("check-email");
       }
       return;
     }
@@ -54,8 +55,10 @@ export default function Auth() {
       if (mode === "login") {
         const { error } = await signIn(email, password);
         if (error) {
-          const msg = error.message.includes("Invalid login")
+          const msg = error.message.includes("Invalid login") || error.message.includes("invalid_credentials")
             ? "Incorrect email or password. Please try again."
+            : error.message.includes("Email not confirmed")
+            ? "Please check your email and click the confirmation link first."
             : error.message;
           toast({ title: "Sign in failed", description: msg, variant: "destructive" });
         } else {
@@ -64,21 +67,68 @@ export default function Auth() {
       } else {
         const { error } = await signUp(email, password);
         if (error) {
-          const msg = error.message.includes("already registered")
+          const msg = error.message.includes("already registered") || error.message.includes("already been registered")
             ? "An account with this email already exists. Try signing in instead."
             : error.message;
           toast({ title: "Sign up failed", description: msg, variant: "destructive" });
         } else {
-          toast({
-            title: "Check your email",
-            description: "We sent you a confirmation link. Please verify your email to sign in.",
-          });
+          // Show confirmation screen
+          setMode("check-email");
         }
       }
     } finally {
       setLoading(false);
     }
   };
+
+  // Check email confirmation screen
+  if (mode === "check-email") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <CheckCircle2 className="h-8 w-8 text-primary" />
+            </div>
+            <CardTitle className="text-2xl" style={{ fontFamily: "'Playfair Display', serif" }}>
+              Check your email
+            </CardTitle>
+            <CardDescription>
+              We sent a confirmation link to <strong>{email}</strong>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+              <div className="flex items-start gap-3">
+                <Mail className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <div className="text-left text-sm">
+                  <p className="font-medium">Next steps:</p>
+                  <ol className="mt-1 list-decimal list-inside space-y-1 text-muted-foreground">
+                    <li>Open your email inbox</li>
+                    <li>Click the confirmation link from Legacy Growth Solutions</li>
+                    <li>You'll be signed in automatically</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Didn't get it? Check your spam folder or{" "}
+              <button
+                type="button"
+                onClick={() => setMode("signup")}
+                className="font-medium text-primary hover:underline"
+              >
+                try again
+              </button>
+            </p>
+            <Button variant="outline" className="w-full" onClick={() => setMode("login")}>
+              Back to sign in
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -132,7 +182,13 @@ export default function Auth() {
               </div>
             )}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Loading..." : mode === "forgot" ? "Send reset link" : mode === "login" ? "Sign in" : "Create account"}
+              {loading
+                ? "Loading..."
+                : mode === "forgot"
+                ? "Send reset link"
+                : mode === "login"
+                ? "Sign in"
+                : "Create account"}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm text-muted-foreground">

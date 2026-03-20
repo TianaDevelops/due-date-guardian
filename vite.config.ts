@@ -18,10 +18,13 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "placeholder.svg"],
+      includeAssets: ["favicon.ico", "placeholder.svg", "sw-push-handler.js"],
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         navigateFallbackDenylist: [/^\/~oauth/],
+        additionalManifestEntries: [
+          { url: "/sw-push-handler.js", revision: null },
+        ],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -44,8 +47,8 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       manifest: {
-        name: "Legacy Growth Solutions — Payment Tracker",
-        short_name: "LGS Tracker",
+        name: "Due Date Guardian",
+        short_name: "DDG",
         description: "Track credit card due dates, bill payments, and get escalating alerts.",
         theme_color: "#1a1a1a",
         background_color: "#1a1a1a",
