@@ -22,10 +22,7 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         globPatterns: ["**/*.{js,css,html,ico,svg,woff2}", "icons/ddg_icon_48.png", "icons/ddg_icon_72.png", "icons/ddg_icon_96.png", "icons/ddg_icon_144.png", "icons/ddg_icon_192.png", "icons/ddg_icon_512.png"],
-        navigateFallbackDenylist: [/^\/~oauth/],
-        additionalManifestEntries: [
-          { url: "/sw-push-handler.js", revision: null },
-        ],
+        navigateFallbackDenylist: [/^\/~oauth/, /^\/auth/, /^\/reset-password/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
