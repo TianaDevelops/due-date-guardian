@@ -8,19 +8,23 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Upload, FileText, AlertCircle, CheckCircle2 } from "lucide-react";
-import { useCreateBill } from "@/hooks/useBills";
+import { useCreateCreditCard } from "@/hooks/useCreditCards";
 import { useToast } from "@/hooks/use-toast";
 
-interface BillImportDialogProps {
+interface CreditCardImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-interface ParsedBill {
-  bill_name: string;
-  amount: number;
-  due_day: number;
-  frequency: string;
+interface ParsedCard {
+  card_name: string;
+  issuer: string;
+  statement_closing_day: number;
+  payment_due_day: number;
+  credit_limit: number;
+  current_balance: number;
+  minimum_payment: number;
+  apr: number;
 }
 
 interface ValidationIssue {
@@ -58,40 +62,58 @@ function normalizeHeader(h: string): string {
 }
 
 const HEADER_MAP: Record<string, string> = {
-  billname: "bill_name",
-  name: "bill_name",
-  bill: "bill_name",
-  amount: "amount",
-  price: "amount",
-  cost: "amount",
-  dueday: "due_day",
-  due: "due_day",
-  day: "due_day",
-  frequency: "frequency",
-  freq: "frequency",
-  recurring: "frequency",
-  cycle: "frequency",
+  // Card name
+  cardname: "card_name",
+  name: "card_name",
+  card: "card_name",
+  // Issuer / bank
+  issuer: "issuer",
+  bank: "issuer",
+  // Statement closing day
+  statementclosingday: "statement_closing_day",
+  statementclose: "statement_closing_day",
+  closingday: "statement_closing_day",
+  closing: "statement_closing_day",
+  statementday: "statement_closing_day",
+  // Payment due day
+  paymentdueday: "payment_due_day",
+  dueday: "payment_due_day",
+  due: "payment_due_day",
+  paymentdue: "payment_due_day",
+  // Credit limit
+  creditlimit: "credit_limit",
+  limit: "credit_limit",
+  // Current balance
+  currentbalance: "current_balance",
+  balance: "current_balance",
+  // Minimum payment
+  minimumpayment: "minimum_payment",
+  minpayment: "minimum_payment",
+  minimum: "minimum_payment",
+  min: "minimum_payment",
+  // APR
+  apr: "apr",
+  rate: "apr",
+  interestrate: "apr",
 };
 
-const SAMPLE_BILL_CSV = `bill_name,amount,due_day,frequency
-Rent,1500,1,monthly
-Electric,120,15,monthly
-Internet,80,20,monthly
-Netflix,18,5,monthly`;
+const SAMPLE_CSV = `card_name,issuer,statement_closing_day,payment_due_day,credit_limit,current_balance,minimum_payment,apr
+Chase Freedom,Chase,15,10,5000,1200,35,19.99
+Citi Double Cash,Citi,20,15,8000,3400,68,22.49`;
 
-export function BillImportDialog({ open, onOpenChange }: BillImportDialogProps) {
+export function CreditCardImportDialog({ open, onOpenChange }: CreditCardImportDialogProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
-  const [parsedBills, setParsedBills] = useState<ParsedBill[]>([]);
+  const [parsedCards, setParsedCards] = useState<ParsedCard[]>([]);
   const [errors, setErrors] = useState<ValidationIssue[]>([]);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success: number; failed: number } | null>(null);
-  const createBill = useCreateBill();
+  const createCard = useCreateCreditCard();
   const { toast } = useToast();
 
   const reset = () => {
     setFileName(null);
-    setParsedBills([]);
+    setParsedCards([]);
     setErrors([]);
     setImportResult(null);
     if (fileRef.current) fileRef.current.value = "";
@@ -115,7 +137,7 @@ export function BillImportDialog({ open, onOpenChange }: BillImportDialogProps) 
     const lines = text.split(/\r?\n/).filter((l) => l.trim());
     if (lines.length < 2) {
       setErrors([{ row: 0, message: "File must have a header row and at least one data row" }]);
-      setParsedBills([]);
+      setParsedCards([]);
       return;
     }
 
@@ -126,51 +148,73 @@ export function BillImportDialog({ open, onOpenChange }: BillImportDialogProps) 
       if (key) colMap[key] = i;
     });
 
-    if (!colMap.bill_name && !colMap.amount) {
+    if (colMap.card_name === undefined && colMap.credit_limit === undefined) {
       setErrors([{
         row: 1,
-        message: `Could not detect columns. Use headers: name, amount, due_day, frequency. Found: ${headerCells.join(", ")}`,
+        message: `Could not detect columns. Use headers: card_name, issuer, statement_closing_day, payment_due_day, credit_limit, current_balance, minimum_payment, apr. Found: ${headerCells.join(", ")}`,
       }]);
-      setParsedBills([]);
+      setParsedCards([]);
       return;
     }
 
-    const bills: ParsedBill[] = [];
+    const cards: ParsedCard[] = [];
     const issues: ValidationIssue[] = [];
 
     for (let i = 1; i < lines.length; i++) {
       const cells = parseCSVLine(lines[i]);
       const rowNum = i + 1;
 
-      const name = colMap.bill_name !== undefined ? cells[colMap.bill_name]?.trim() : "";
-      const amountStr = colMap.amount !== undefined ? cells[colMap.amount]?.trim() : "";
-      const dueDayStr = colMap.due_day !== undefined ? cells[colMap.due_day]?.trim() : "";
-      const freq = colMap.frequency !== undefined ? cells[colMap.frequency]?.trim().toLowerCase() : "monthly";
-
+      const name = colMap.card_name !== undefined ? cells[colMap.card_name]?.trim() : "";
       if (!name) {
-        issues.push({ row: rowNum, message: "Missing bill name" });
+        issues.push({ row: rowNum, message: "Missing card name" });
         continue;
       }
 
-      const amount = parseFloat(amountStr.replace(/[$,]/g, ""));
-      if (isNaN(amount) || amount <= 0) {
-        issues.push({ row: rowNum, message: `Invalid amount "${amountStr}" for ${name}` });
+      const issuer = colMap.issuer !== undefined ? cells[colMap.issuer]?.trim() ?? "" : "";
+
+      const statementClosingDayStr = colMap.statement_closing_day !== undefined ? cells[colMap.statement_closing_day]?.trim() : "";
+      let statementClosingDay = parseInt(statementClosingDayStr);
+      if (isNaN(statementClosingDay) || statementClosingDay < 1 || statementClosingDay > 31) {
+        issues.push({ row: rowNum, message: `Invalid statement closing day "${statementClosingDayStr}" for ${name}, defaulting to 1` });
+        statementClosingDay = 1;
+      }
+
+      const paymentDueDayStr = colMap.payment_due_day !== undefined ? cells[colMap.payment_due_day]?.trim() : "";
+      let paymentDueDay = parseInt(paymentDueDayStr);
+      if (isNaN(paymentDueDay) || paymentDueDay < 1 || paymentDueDay > 31) {
+        issues.push({ row: rowNum, message: `Invalid payment due day "${paymentDueDayStr}" for ${name}, defaulting to 1` });
+        paymentDueDay = 1;
+      }
+
+      const creditLimitStr = colMap.credit_limit !== undefined ? cells[colMap.credit_limit]?.trim() : "0";
+      const creditLimit = parseFloat(creditLimitStr.replace(/[$,]/g, ""));
+      if (isNaN(creditLimit) || creditLimit < 0) {
+        issues.push({ row: rowNum, message: `Invalid credit limit "${creditLimitStr}" for ${name}` });
         continue;
       }
 
-      let dueDay = parseInt(dueDayStr);
-      if (isNaN(dueDay) || dueDay < 1 || dueDay > 31) {
-        issues.push({ row: rowNum, message: `Invalid due day "${dueDayStr}" for ${name}, defaulting to 1` });
-        dueDay = 1;
-      }
+      const currentBalanceStr = colMap.current_balance !== undefined ? cells[colMap.current_balance]?.trim() : "0";
+      const currentBalance = parseFloat(currentBalanceStr.replace(/[$,]/g, "")) || 0;
 
-      const validFreqs = ["weekly", "monthly", "quarterly"];
-      const frequency = validFreqs.includes(freq) ? freq : "monthly";
+      const minimumPaymentStr = colMap.minimum_payment !== undefined ? cells[colMap.minimum_payment]?.trim() : "0";
+      const minimumPayment = parseFloat(minimumPaymentStr.replace(/[$,]/g, "")) || 0;
 
-      bills.push({ bill_name: name, amount, due_day: dueDay, frequency });
+      const aprStr = colMap.apr !== undefined ? cells[colMap.apr]?.trim() : "0";
+      const apr = parseFloat(aprStr.replace(/%/g, "")) || 0;
+
+      cards.push({
+        card_name: name,
+        issuer,
+        statement_closing_day: statementClosingDay,
+        payment_due_day: paymentDueDay,
+        credit_limit: creditLimit,
+        current_balance: currentBalance,
+        minimum_payment: minimumPayment,
+        apr,
+      });
     }
 
-    setParsedBills(bills);
+    setParsedCards(cards);
     setErrors(issues);
   };
 
@@ -179,9 +223,9 @@ export function BillImportDialog({ open, onOpenChange }: BillImportDialogProps) 
     let success = 0;
     let failed = 0;
 
-    for (const bill of parsedBills) {
+    for (const card of parsedCards) {
       try {
-        await createBill.mutateAsync(bill);
+        await createCard.mutateAsync(card);
         success++;
       } catch {
         failed++;
@@ -192,20 +236,30 @@ export function BillImportDialog({ open, onOpenChange }: BillImportDialogProps) 
     setImporting(false);
 
     if (success > 0) {
-      toast({ title: `Imported ${success} bill${success > 1 ? "s" : ""}` });
+      toast({ title: `Imported ${success} card${success > 1 ? "s" : ""}` });
     }
     if (failed > 0) {
-      toast({ title: `${failed} bill${failed > 1 ? "s" : ""} failed to import`, variant: "destructive" });
+      toast({ title: `${failed} card${failed > 1 ? "s" : ""} failed to import`, variant: "destructive" });
     }
+  };
+
+  const downloadSample = () => {
+    const blob = new Blob([SAMPLE_CSV], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "credit_cards_sample.csv";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) reset(); }}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Import Bills from CSV</DialogTitle>
+          <DialogTitle>Import Credit Cards from CSV</DialogTitle>
           <DialogDescription>
-            Upload a CSV file with columns: <strong>name</strong>, <strong>amount</strong>, <strong>due_day</strong>, <strong>frequency</strong>
+            Upload a CSV with columns: <strong>card_name</strong>, <strong>issuer</strong>, <strong>statement_closing_day</strong>, <strong>payment_due_day</strong>, <strong>credit_limit</strong>, <strong>current_balance</strong>, <strong>minimum_payment</strong>, <strong>apr</strong>
           </DialogDescription>
         </DialogHeader>
 
@@ -213,15 +267,7 @@ export function BillImportDialog({ open, onOpenChange }: BillImportDialogProps) 
           {/* Sample download */}
           <button
             type="button"
-            onClick={() => {
-              const blob = new Blob([SAMPLE_BILL_CSV], { type: "text/csv" });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = "bills_sample.csv";
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
+            onClick={downloadSample}
             className="text-xs text-primary hover:underline"
           >
             Download sample CSV template
@@ -245,7 +291,7 @@ export function BillImportDialog({ open, onOpenChange }: BillImportDialogProps) 
             />
           </div>
 
-          {/* Errors */}
+          {/* Errors / warnings */}
           {errors.length > 0 && (
             <div className="max-h-32 space-y-1 overflow-y-auto rounded-lg bg-destructive/5 p-3">
               {errors.map((err, i) => (
@@ -257,30 +303,32 @@ export function BillImportDialog({ open, onOpenChange }: BillImportDialogProps) 
             </div>
           )}
 
-          {/* Preview */}
-          {parsedBills.length > 0 && !importResult && (
+          {/* Preview table */}
+          {parsedCards.length > 0 && !importResult && (
             <div className="space-y-2">
               <p className="text-sm font-medium">
                 <CheckCircle2 className="mr-1 inline h-4 w-4 text-success" />
-                {parsedBills.length} bill{parsedBills.length > 1 ? "s" : ""} ready to import
+                {parsedCards.length} card{parsedCards.length > 1 ? "s" : ""} ready to import
               </p>
               <div className="max-h-48 overflow-y-auto rounded-lg border">
                 <table className="w-full text-xs">
                   <thead className="bg-muted/50 sticky top-0">
                     <tr>
                       <th className="px-3 py-1.5 text-left font-medium">Name</th>
-                      <th className="px-3 py-1.5 text-right font-medium">Amount</th>
+                      <th className="px-3 py-1.5 text-right font-medium">Limit</th>
+                      <th className="px-3 py-1.5 text-right font-medium">Balance</th>
                       <th className="px-3 py-1.5 text-right font-medium">Due Day</th>
-                      <th className="px-3 py-1.5 text-left font-medium">Freq</th>
+                      <th className="px-3 py-1.5 text-right font-medium">APR</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {parsedBills.map((b, i) => (
+                    {parsedCards.map((c, i) => (
                       <tr key={i} className="border-t">
-                        <td className="px-3 py-1.5">{b.bill_name}</td>
-                        <td className="px-3 py-1.5 text-right font-mono">${b.amount.toFixed(2)}</td>
-                        <td className="px-3 py-1.5 text-right">{b.due_day}</td>
-                        <td className="px-3 py-1.5 capitalize">{b.frequency}</td>
+                        <td className="px-3 py-1.5 truncate max-w-[120px]">{c.card_name}</td>
+                        <td className="px-3 py-1.5 text-right font-mono">${c.credit_limit.toFixed(0)}</td>
+                        <td className="px-3 py-1.5 text-right font-mono">${c.current_balance.toFixed(0)}</td>
+                        <td className="px-3 py-1.5 text-right">{c.payment_due_day}</td>
+                        <td className="px-3 py-1.5 text-right">{c.apr}%</td>
                       </tr>
                     ))}
                   </tbody>
@@ -304,10 +352,10 @@ export function BillImportDialog({ open, onOpenChange }: BillImportDialogProps) 
             <Button variant="outline" onClick={() => { onOpenChange(false); reset(); }}>
               {importResult ? "Close" : "Cancel"}
             </Button>
-            {parsedBills.length > 0 && !importResult && (
+            {parsedCards.length > 0 && !importResult && (
               <Button onClick={handleImport} disabled={importing}>
                 <FileText className="mr-1 h-4 w-4" />
-                {importing ? "Importing..." : `Import ${parsedBills.length} Bill${parsedBills.length > 1 ? "s" : ""}`}
+                {importing ? "Importing..." : `Import ${parsedCards.length} Card${parsedCards.length > 1 ? "s" : ""}`}
               </Button>
             )}
           </div>

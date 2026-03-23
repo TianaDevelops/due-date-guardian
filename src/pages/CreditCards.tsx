@@ -4,9 +4,10 @@ import { getDaysUntilDue, formatCurrency, formatDueDate } from "@/lib/dates";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { UtilizationBar } from "@/components/UtilizationBar";
 import { CreditCardDialog } from "@/components/CreditCardDialog";
+import { CreditCardImportDialog } from "@/components/CreditCardImportDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Trash2, CreditCard as CardIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, CreditCard as CardIcon, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function CreditCards() {
@@ -14,6 +15,7 @@ export default function CreditCards() {
   const deleteCard = useDeleteCreditCard();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<CreditCard | null>(null);
 
   const handleEdit = (card: CreditCard) => {
@@ -42,10 +44,16 @@ export default function CreditCards() {
           <h1 className="text-2xl font-bold lg:text-3xl">Credit Cards</h1>
           <p className="text-sm text-muted-foreground">Manage your credit cards and track utilization</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="mr-1 h-4 w-4" />
-          Add Card
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+            <Upload className="mr-1 h-4 w-4" />
+            Import CSV
+          </Button>
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="mr-1 h-4 w-4" />
+            Add Card
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -129,6 +137,7 @@ export default function CreditCards() {
       )}
 
       <CreditCardDialog open={dialogOpen} onOpenChange={handleDialogClose} card={editingCard} />
+      <CreditCardImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
     </div>
   );
 }
