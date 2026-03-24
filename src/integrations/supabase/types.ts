@@ -74,6 +74,7 @@ export type Database = {
           frequency: string
           id: string
           is_paid_this_cycle: boolean
+          last_payment_date: string | null
           updated_at: string
           user_id: string
         }
@@ -85,6 +86,7 @@ export type Database = {
           frequency?: string
           id?: string
           is_paid_this_cycle?: boolean
+          last_payment_date?: string | null
           updated_at?: string
           user_id: string
         }
@@ -96,6 +98,7 @@ export type Database = {
           frequency?: string
           id?: string
           is_paid_this_cycle?: boolean
+          last_payment_date?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -110,6 +113,7 @@ export type Database = {
           current_balance: number
           id: string
           issuer: string | null
+          last_payment_date: string | null
           minimum_payment: number
           payment_due_day: number
           statement_closing_day: number
@@ -124,6 +128,7 @@ export type Database = {
           current_balance?: number
           id?: string
           issuer?: string | null
+          last_payment_date?: string | null
           minimum_payment?: number
           payment_due_day: number
           statement_closing_day: number
@@ -138,6 +143,7 @@ export type Database = {
           current_balance?: number
           id?: string
           issuer?: string | null
+          last_payment_date?: string | null
           minimum_payment?: number
           payment_due_day?: number
           statement_closing_day?: number

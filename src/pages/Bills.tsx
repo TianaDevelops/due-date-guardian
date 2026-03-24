@@ -2,12 +2,14 @@ import { useState } from "react";
 import { useBills, useUpdateBill, useDeleteBill, type Bill } from "@/hooks/useBills";
 import { getDaysUntilDue, formatCurrency, formatDueDate } from "@/lib/dates";
 import { UrgencyBadge } from "@/components/UrgencyBadge";
+import { OverdueBanner, calcDaysOverdue } from "@/components/OverdueBanner";
 import { BillDialog } from "@/components/BillDialog";
 import { BillImportDialog } from "@/components/BillImportDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Pencil, Trash2, Receipt, Check, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 export default function Bills() {
   const { data: bills = [], isLoading } = useBills();
@@ -34,12 +36,15 @@ export default function Bills() {
 
   const handleTogglePaid = async (bill: Bill) => {
     try {
+      const nowPaid = !bill.is_paid_this_cycle;
       await updateBill.mutateAsync({
         id: bill.id,
-        is_paid_this_cycle: !bill.is_paid_this_cycle,
+        is_paid_this_cycle: nowPaid,
+        // Record payment date when marking as paid; clear it when unmarking
+        last_payment_date: nowPaid ? format(new Date(), "yyyy-MM-dd") : null,
       });
       toast({
-        title: bill.is_paid_this_cycle ? "Marked as unpaid" : "Marked as paid",
+        title: nowPaid ? "Marked as paid" : "Marked as unpaid",
       });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -53,6 +58,15 @@ export default function Bills() {
 
   const unpaidBills = bills.filter((b) => !b.is_paid_this_cycle);
   const paidBills = bills.filter((b) => b.is_paid_this_cycle);
+
+  // Collect overdue bills for the top banner
+  const overdueBills = unpaidBills
+    .map((b) => ({
+      bill: b,
+      daysOverdue: calcDaysOverdue(b.due_day, b.last_payment_date, b.is_paid_this_cycle),
+    }))
+    .filter(({ daysOverdue }) => daysOverdue > 0)
+    .sort((a, b) => b.daysOverdue - a.daysOverdue);
 
   return (
     <div className="space-y-6">
@@ -72,6 +86,21 @@ export default function Bills() {
           </Button>
         </div>
       </div>
+
+      {/* Overdue summary banners */}
+      {overdueBills.length > 0 && (
+        <div className="space-y-2">
+          {overdueBills.map(({ bill, daysOverdue }) => (
+            <OverdueBanner
+              key={bill.id}
+              daysOverdue={daysOverdue}
+              name={bill.bill_name}
+              amount={Number(bill.amount)}
+            />
+          ))}
+        </div>
+      )}
+
       {isLoading ? (
         <p className="text-muted-foreground">Loading...</p>
       ) : bills.length === 0 ? (
@@ -96,8 +125,12 @@ export default function Bills() {
               </h2>
               {unpaidBills.map((bill) => {
                 const daysUntil = getDaysUntilDue(bill.due_day);
+                const daysOverdue = calcDaysOverdue(bill.due_day, bill.last_payment_date, bill.is_paid_this_cycle);
                 return (
-                  <Card key={bill.id}>
+                  <Card
+                    key={bill.id}
+                    className={daysOverdue >= 25 ? "border-destructive/60" : daysOverdue > 0 ? "border-orange-400/60" : ""}
+                  >
                     <CardContent className="flex items-center gap-4 p-4">
                       <button
                         onClick={() => handleTogglePaid(bill)}
@@ -111,14 +144,27 @@ export default function Bills() {
                           <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">
                             {bill.frequency}
                           </span>
+                          {daysOverdue >= 25 && (
+                            <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-[10px] font-bold uppercase text-destructive animate-pulse">
+                              Bureau Risk
+                            </span>
+                          )}
                         </div>
                         <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
                           <span>Due {formatDueDate(bill.due_day)}</span>
                           <span>•</span>
                           <span className="font-mono">{formatCurrency(Number(bill.amount))}</span>
+                          {daysOverdue > 0 && (
+                            <>
+                              <span>•</span>
+                              <span className={daysOverdue >= 14 ? "font-semibold text-destructive" : "font-semibold text-orange-600 dark:text-orange-400"}>
+                                {daysOverdue}d overdue
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
-                      <UrgencyBadge daysUntil={daysUntil} />
+                      <UrgencyBadge daysUntil={daysOverdue > 0 ? -daysOverdue : daysUntil} />
                       <div className="flex gap-1">
                         <Button size="icon" variant="ghost" onClick={() => handleEdit(bill)}>
                           <Pencil className="h-4 w-4" />
@@ -160,6 +206,9 @@ export default function Bills() {
                       </div>
                       <div className="mt-0.5 text-xs text-muted-foreground">
                         <span className="font-mono">{formatCurrency(Number(bill.amount))}</span>
+                        {bill.last_payment_date && (
+                          <span className="ml-2">Paid {bill.last_payment_date}</span>
+                        )}
                       </div>
                     </div>
                     <div className="flex gap-1">
